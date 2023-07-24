@@ -1,0 +1,7 @@
+pip
+openai
+langchain
+python-dotenv
+beautifulsoup4
+requests
+tiktoken
