@@ -1,5 +1,5 @@
 # 📄 Document Extraction
-*Plan extraction, embedding creation, and comparison between three document types (Wikipedia articles, arXiv papers, and patents).*
+*Plan extraction, embedding creation, and comparison for three document types (Wikipedia articles, arXiv papers, and patents).*
 
 ## 💻 How to Run the Code
 
