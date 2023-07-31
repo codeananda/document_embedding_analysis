@@ -7,3 +7,7 @@ requests
 tiktoken
 doctran
 sentence-transformers
+evaluate
+mauve-text
+rouge_score
+absl-py
