@@ -1,3 +1,4 @@
+import asyncio
 import os
 from copy import copy
 from pprint import pprint
@@ -10,11 +11,13 @@ import tiktoken
 from bs4 import BeautifulSoup, Comment
 from doctran import Doctran, ExtractProperty
 from dotenv import load_dotenv, find_dotenv
+from evaluate import load
 from langchain.embeddings import OpenAIEmbeddings, HuggingFaceEmbeddings
 from langchain.text_splitter import (
     RecursiveCharacterTextSplitter,
 )
 from loguru import logger
+from sklearn.metrics.pairwise import cosine_similarity
 
 _ = load_dotenv(find_dotenv())
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -128,7 +131,7 @@ async def divide_sections_if_too_large_in_plan_and_sectionscontent(
     title, and returns the updated dictionary
     """
     logger.info("Dividing sections if too large in plan and section content.")
-    final_dict: dict = {}
+    final_dict: Dict = {}
     start_dict = copy(article_dict)
     for heading, content in start_dict.items():
         if (
@@ -200,10 +203,11 @@ def create_section_json(
     return section_json
 
 
-def create_plan_json(article_dict: dict) -> dict:
+def create_plan_json(article_dict: Dict) -> Dict:
     """Given a dictionary of the article content, returns a dictionary with the title,
     abstract, plan and associated embeddings.
     """
+    logger.info('Creating plan json')
     headings = list(article_dict.keys())
     content = list(article_dict.values())
 
@@ -257,13 +261,64 @@ def create_plan_json(article_dict: dict) -> dict:
             "error": str(e),
         }
 
+    logger.info('Finished creating plan json')
+    return plan_json
+
+
+def compare_plans(plan_1: Dict, plan_2: Dict) -> Dict:
+    """Given two plans, returns a dictionary with the cosine similarity of the plans
+    and the similarity scores of the plans (comparing both embeddings and text).
+    """
+    # TODO - how to handle the full content of each plan? It's way too big.
+    plan_1_content: str = ...
+    plan_2_content: str = ...
+
+    # Mauve & Rouge have to compare the actual text strings themselves, not embeddings
+    mauve = load("mauve")
+    mauve_results = mauve.compute(predictions=[plan_1_content], references=[plan_2_content])
+    mauve_similarity = mauve_results.mauve
+
+    rouge = load("rouge")
+    results = rouge.compute(
+        predictions=[plan_1_content], references=[plan_2_content], rouge_types=["rougeL"]
+    )
+    rouge_L_similarity = results["rougeL"]
+
+    cosine_1 = cosine_similarity(
+        [plan_1["plan_embedding_1"]], [plan_2["plan_embedding_1"]]
+    )[0][0]
+    cosine_2 = cosine_similarity(
+        [plan_1["plan_embedding_2"]], [plan_2["plan_embedding_2"]]
+    )[0][0]
+
+    comparison_dict = {
+        "document_id": str(uuid4()),
+        "prediction_id": str(uuid4()),
+        "plan_similarity": {
+            'embedding1_cosine_similarity': cosine_1,
+            'embedding2_cosine_similarity': cosine_2,
+            'mauve_similarity': mauve_similarity,
+            'rougeL_similarity': rouge_L_similarity,
+        }
+    }
+    return comparison_dict
+
+# TODO
+def compare_content(plan_1: Dict, plan_2: Dict) -> Dict:
+    pass
+
+
+async def main(url: str) -> Dict:
+    """Given a Wikipedia URL, returns a dictionary with the title, abstract, plan and
+    associated embeddings.
+    """
+    article_dict = extract_content_from_wikipedia_url(url)
+    article_dict = await divide_sections_if_too_large_in_plan_and_sectionscontent(article_dict)
+    plan_json = create_plan_json(article_dict)
     return plan_json
 
 
 if __name__ == "__main__":
-    pprint(
-        extract_content_from_wikipedia_url(
-            "https://en.wikipedia.org/wiki/Dual-phase_evolution"
-        ),
-        sort_dicts=False,
-    )
+    url = 'https://en.wikipedia.org/wiki/Dual-phase_evolution'
+    plan_json = asyncio.run(main(url))
+    pprint(plan_json, sort_dicts=False)
