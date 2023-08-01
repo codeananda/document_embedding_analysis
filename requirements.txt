@@ -12,3 +12,4 @@ mauve-text
 rouge_score
 absl-py
 loguru
+scikit-learn
