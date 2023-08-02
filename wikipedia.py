@@ -133,20 +133,28 @@ async def divide_sections_if_too_large_in_plan_and_sectionscontent(
     logger.info("Dividing sections if too large in plan and section content.")
     final_dict: Dict = {}
     start_dict = copy(article_dict)
+
+    def is_reference_section(heading: str):
+        """Returns True if heading is a reference section."""
+        heading = heading.lower()
+        result = (
+            "reference" in heading
+            or "further reading" in heading
+            or "see also" in heading
+        )
+        return result
+
     for heading, content in start_dict.items():
-        if (
-            "reference" in heading.lower()
-            or "further reading" in heading.lower()
-            or "see also" in heading.lower()
-        ):
-            final_dict[heading] = content
-            continue
         num_tokens = num_tokens_from_string(content)
+        # Each section must contain something, otherwise the embedding models fail
+        if num_tokens == 0:
+            final_dict[heading] = " "
         # If the section is small enough, add it to the final dict
-        if num_tokens <= max_section_length:
+        elif num_tokens <= max_section_length:
             final_dict[heading] = content
+        # If section is too big, split into smaller sections, extract title, and add to final dict
         else:
-            # Split the document into smaller chunks, then add topics
+            # Split
             char_splitter = RecursiveCharacterTextSplitter(
                 chunk_size=max_section_length,
                 chunk_overlap=0,
@@ -156,20 +164,28 @@ async def divide_sections_if_too_large_in_plan_and_sectionscontent(
                 length_function=num_tokens_from_string,
             )
             splits: List[str] = char_splitter.split_text(content)
-            for split in splits:
-                # Headings are of the form h1, h2, h3 etc. we split it into more of the same level
-                heading_level = int(heading[1])
-                title = await extract_title(split)
-                new_heading = f"h{heading_level}_{title}"
-                final_dict[new_heading] = split
-                logger.info(f"Added {new_heading} split original heading {heading}")
+            # Keep heading the same but add numbers to sections e.g. 'h2 Reference' -> 'h2 Reference 1'
+            if is_reference_section(heading):
+                for i, split in enumerate(splits, start=1):
+                    new_heading = f"{heading} {i}"
+                    final_dict[new_heading] = split
+                    logger.info(f"Added {new_heading} split original heading {heading}")
+            # Split heading into more of the same level and add new title
+            else:
+                for split in splits:
+                    # Headings are of the form h1, h2, h3 etc. we split it into more of the same level
+                    heading_level = int(heading[1])
+                    title = await extract_title(split)
+                    new_heading = f"h{heading_level} {title}"
+                    final_dict[new_heading] = split
+                    logger.info(f"Added {new_heading} split original heading {heading}")
 
     n_keys_start = len(start_dict.keys())
     n_keys_final = len(final_dict.keys())
     logger.info(
-        f"\nFinished dividing sections if too large in plan and section content.\n"
-        f"We started with {n_keys_start} sections and got {n_keys_final} final sections.\n"
-        f"That's a {n_keys_final / n_keys_start:.2f}x increase in sections"
+        f"\n\tFinished dividing sections if too large in plan and section content."
+        f"\n\tStarted with {n_keys_start} sections and got {n_keys_final} final sections."
+        f"\n\tThat's a {n_keys_final / n_keys_start:.2f}x increase in sections"
     )
     return final_dict
 
@@ -207,7 +223,7 @@ def create_plan_json(article_dict: Dict) -> Dict:
     """Given a dictionary of the article content, returns a dictionary with the title,
     abstract, plan and associated embeddings.
     """
-    logger.info('Creating plan json')
+    logger.info("Creating plan json")
     headings = list(article_dict.keys())
     content = list(article_dict.values())
 
@@ -261,7 +277,7 @@ def create_plan_json(article_dict: Dict) -> Dict:
             "error": str(e),
         }
 
-    logger.info('Finished creating plan json')
+    logger.info("Finished creating plan json")
     return plan_json
 
 
@@ -275,12 +291,16 @@ def compare_plans(plan_1: Dict, plan_2: Dict) -> Dict:
 
     # Mauve & Rouge have to compare the actual text strings themselves, not embeddings
     mauve = load("mauve")
-    mauve_results = mauve.compute(predictions=[plan_1_content], references=[plan_2_content])
+    mauve_results = mauve.compute(
+        predictions=[plan_1_content], references=[plan_2_content]
+    )
     mauve_similarity = mauve_results.mauve
 
     rouge = load("rouge")
     results = rouge.compute(
-        predictions=[plan_1_content], references=[plan_2_content], rouge_types=["rougeL"]
+        predictions=[plan_1_content],
+        references=[plan_2_content],
+        rouge_types=["rougeL"],
     )
     rouge_L_similarity = results["rougeL"]
 
@@ -295,13 +315,14 @@ def compare_plans(plan_1: Dict, plan_2: Dict) -> Dict:
         "document_id": str(uuid4()),
         "prediction_id": str(uuid4()),
         "plan_similarity": {
-            'embedding1_cosine_similarity': cosine_1,
-            'embedding2_cosine_similarity': cosine_2,
-            'mauve_similarity': mauve_similarity,
-            'rougeL_similarity': rouge_L_similarity,
-        }
+            "embedding1_cosine_similarity": cosine_1,
+            "embedding2_cosine_similarity": cosine_2,
+            "mauve_similarity": mauve_similarity,
+            "rougeL_similarity": rouge_L_similarity,
+        },
     }
     return comparison_dict
+
 
 # TODO
 def compare_content(plan_1: Dict, plan_2: Dict) -> Dict:
@@ -313,12 +334,15 @@ async def main(url: str) -> Dict:
     associated embeddings.
     """
     article_dict = extract_content_from_wikipedia_url(url)
-    article_dict = await divide_sections_if_too_large_in_plan_and_sectionscontent(article_dict)
+    article_dict = await divide_sections_if_too_large_in_plan_and_sectionscontent(
+        article_dict
+    )
     plan_json = create_plan_json(article_dict)
     return plan_json
 
 
 if __name__ == "__main__":
-    url = 'https://en.wikipedia.org/wiki/Dual-phase_evolution'
+    url = "https://en.wikipedia.org/wiki/Dual-phase_evolution"
+    url = "https://en.wikipedia.org/wiki/Self-driving_car"
     plan_json = asyncio.run(main(url))
     pprint(plan_json, sort_dicts=False)
