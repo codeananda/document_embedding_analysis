@@ -4,6 +4,7 @@ from copy import copy
 from pprint import pprint
 from typing import List, Dict
 from uuid import uuid4
+from time import time
 
 import numpy as np
 import openai
@@ -521,14 +522,22 @@ async def extract_plan_and_content_wikipedia(url: str) -> Dict:
     """Given a Wikipedia URL, returns a dictionary with the title, abstract, plan and
     associated embeddings.
     """
+    start = time()
     article_dict = extract_content_from_wikipedia_url(url)
     article_dict = await divide_sections_if_too_large(article_dict)
     plan_json = generate_embeddings_plan_and_section_content(article_dict)
+    end = time()
+    seconds = round(end - start)
+    minutes = round(seconds / 60, 2)
+    logger.info(
+        f"\n\tSuccessfully extracted plan and content for {url}"
+        f"\n\tTime taken: {minutes} min ({seconds}s)"
+    )
     return plan_json
 
 
 if __name__ == "__main__":
     url = "https://en.wikipedia.org/wiki/Dual-phase_evolution"
-    url = "https://en.wikipedia.org/wiki/Self-driving_car"
+    # url = "https://en.wikipedia.org/wiki/Self-driving_car"
     plan_json = asyncio.run(extract_plan_and_content_wikipedia(url))
-    pprint(plan_json, sort_dicts=False)
+    # pprint(plan_json, sort_dicts=False)
