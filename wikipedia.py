@@ -373,6 +373,42 @@ def compare_content(plan_1: Dict, plan_2: Dict) -> Dict:
     pass
 
 
+async def get_embeddings(
+    input: str | List[str], model: str = "text-embedding-ada-002"
+) -> List[float] | List[List[float]]:
+    """This function takes one string or a list of strings and a model name,
+    generates an embedding for each string in the list using the specified model,
+    and returns a list of embeddings, each represented as a list of floating point
+    numbers.
+
+    Parameters
+    ----------
+    input : str | List[str]
+        The input string or list of strings to be embedded.
+    model : str, optional ['text-embedding-ada-002', 'e5-base-v2']
+        The name of the model to be used for embedding.
+    """
+    if model == "text-embedding-ada-002":
+        embedder = OpenAIEmbeddings(model=model)
+    elif model == "e5-base-v2":
+        embedder = HuggingFaceEmbeddings(
+            model_name=model, encode_kwargs={"normalize_embeddings": True}
+        )
+    else:
+        raise ValueError(
+            f"Model name must be 'text-embedding-ada-002' or 'e5-base-v2'. Received {model}"
+        )
+
+    if isinstance(input, str):
+        return await embedder.aembed_query(input)
+    elif isinstance(input, list):
+        return await embedder.aembed_documents(input)
+    else:
+        raise ValueError(
+            f"Input must be a string or a list of strings. Received {type(input)}"
+        )
+
+
 def compare_documents(document: dict, prediction: dict, compare_on: str = "section"):
     """Compare the 'compare_on' sections of document and prediction. Calculate MAUVE,
     and ROUGE-L scores on the actual text, and cosine similarity on the embeddings.
