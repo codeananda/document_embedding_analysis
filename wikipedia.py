@@ -123,7 +123,7 @@ async def extract_title(string: str) -> str:
     return document.transformed_content
 
 
-async def divide_sections_if_too_large_in_plan_and_sectionscontent(
+async def divide_sections_if_too_large(
     article_dict: Dict[str, str], max_section_length: int = 512
 ) -> Dict[str, str]:
     """This function takes an existing dictionary containing the plan and sections
@@ -191,7 +191,7 @@ async def divide_sections_if_too_large_in_plan_and_sectionscontent(
     return final_dict
 
 
-def create_section_json(
+def _gen_embed_section_content(
     heading: str, content: str, id: int = 1, total_sections: int = 1
 ) -> Dict[str, str | list[float]]:
     """Given a heading and content, returns a dictionary with the heading, content,
@@ -234,7 +234,7 @@ def create_section_json(
     return section_json
 
 
-def create_plan_embedding(plan: List[dict], i: int) -> List[float]:
+def _gen_embed_plan(plan: List[dict], i: int) -> List[float]:
     """Calculate plan embedding by averaging the section embeddings and content embeddings
     sequentially.
 
@@ -260,7 +260,7 @@ def create_plan_embedding(plan: List[dict], i: int) -> List[float]:
     return total_mean
 
 
-def create_plan_json(article_dict: Dict) -> Dict:
+def generate_embeddings_plan_and_section_content(article_dict: Dict) -> Dict:
     """Given a dictionary of the article content, returns a dictionary with the title,
     abstract, plan and associated embeddings.
     """
@@ -272,11 +272,13 @@ def create_plan_json(article_dict: Dict) -> Dict:
     abstract = content[0]
     total_sections = len(headings) - 1
     plan = [
-        create_section_json(heading, content, id=i, total_sections=total_sections)
+        _gen_embed_section_content(
+            heading, content, id=i, total_sections=total_sections
+        )
         for i, (heading, content) in enumerate(zip(headings[1:], content[1:]), start=1)
     ]
-    plan_embed_1 = create_plan_embedding(plan, 1)
-    plan_embed_2 = create_plan_embedding(plan, 2)
+    plan_embed_1 = _gen_embed_plan(plan, 1)
+    plan_embed_2 = _gen_embed_plan(plan, 2)
     # Normalized by default
     embed_ada = OpenAIEmbeddings(
         model="text-embedding-ada-002",
@@ -515,20 +517,18 @@ def compare_documents(document: dict, prediction: dict, compare_on: str = "secti
     return output
 
 
-async def main(url: str) -> Dict:
+async def extract_plan_and_content_wikipedia(url: str) -> Dict:
     """Given a Wikipedia URL, returns a dictionary with the title, abstract, plan and
     associated embeddings.
     """
     article_dict = extract_content_from_wikipedia_url(url)
-    article_dict = await divide_sections_if_too_large_in_plan_and_sectionscontent(
-        article_dict
-    )
-    plan_json = create_plan_json(article_dict)
+    article_dict = await divide_sections_if_too_large(article_dict)
+    plan_json = generate_embeddings_plan_and_section_content(article_dict)
     return plan_json
 
 
 if __name__ == "__main__":
     url = "https://en.wikipedia.org/wiki/Dual-phase_evolution"
     url = "https://en.wikipedia.org/wiki/Self-driving_car"
-    plan_json = asyncio.run(main(url))
+    plan_json = asyncio.run(extract_plan_and_content_wikipedia(url))
     pprint(plan_json, sort_dicts=False)
