@@ -5,6 +5,7 @@ from pprint import pprint
 from typing import List, Dict
 from uuid import uuid4
 
+import numpy as np
 import openai
 import requests
 import tiktoken
@@ -191,10 +192,22 @@ async def divide_sections_if_too_large_in_plan_and_sectionscontent(
 
 
 def create_section_json(
-    heading: str, content: str, id=1
+    heading: str, content: str, id: int = 1, total_sections: int = 1
 ) -> Dict[str, str | list[float]]:
     """Given a heading and content, returns a dictionary with the heading, content,
-    and embeddings of the heading and content."""
+    and embeddings of the heading and content.
+
+    Parameters
+    ----------
+    heading : str
+        The heading of the section.
+    content : str
+        The content of the section.
+    id : int, optional
+        The id of the section, by default 1
+    total_sections : int, optional
+        The total number of sections, by default 1
+    """
     # Normalized by default
     embed_ada = OpenAIEmbeddings(
         model="text-embedding-ada-002",
@@ -214,9 +227,37 @@ def create_section_json(
         "content_embedding_2": embed_e5.embed_query("query: " + content),
     }
 
-    logger.info(f"section_id {id} - created section json + embeddings for {heading}")
+    logger.info(
+        f"{id}/{total_sections} - created section + content embeddings for {heading}"
+    )
 
     return section_json
+
+
+def create_plan_embedding(plan: List[dict], i: int) -> List[float]:
+    """Calculate plan embedding by averaging the section embeddings and content embeddings
+    sequentially.
+
+    Parameters
+    ----------
+    plan : List[dict]
+        List of dictionaries, each containing the section and content embeddings.
+    i : int
+        The index of the embedding to use.
+    """
+    try:
+        s1_mean = np.mean([x[f"section_embedding_{i}"] for x in plan], axis=0)
+        c1_mean = np.mean([x[f"content_embedding_{i}"] for x in plan], axis=0)
+    except KeyError:
+        raise KeyError(
+            f"Could not find section_embedding_{i} or content_embedding_{i} in "
+            f"every element in plan. Please check that every element has both of these "
+            f"keys."
+        )
+    total_mean = np.mean([c1_mean, s1_mean], axis=0)
+    total_mean = list(total_mean)
+    logger.info(f"Created plan embedding {i}")
+    return total_mean
 
 
 def create_plan_json(article_dict: Dict) -> Dict:
@@ -229,10 +270,13 @@ def create_plan_json(article_dict: Dict) -> Dict:
 
     title = headings[0][3:]
     abstract = content[0]
+    total_sections = len(headings) - 1
     plan = [
-        create_section_json(heading, content, id=i)
+        create_section_json(heading, content, id=i, total_sections=total_sections)
         for i, (heading, content) in enumerate(zip(headings[1:], content[1:]), start=1)
     ]
+    plan_embed_1 = create_plan_embedding(plan, 1)
+    plan_embed_2 = create_plan_embedding(plan, 2)
     # Normalized by default
     embed_ada = OpenAIEmbeddings(
         model="text-embedding-ada-002",
@@ -252,8 +296,8 @@ def create_plan_json(article_dict: Dict) -> Dict:
             "abstract_embedding_1": embed_ada.embed_query(abstract),
             "abstract_embedding_2": embed_e5.embed_query("query: " + abstract),
             "plan": plan,
-            "plan_embedding_1": "???",
-            "plan_embedding_2": "???",
+            "plan_embedding_1": plan_embed_1,
+            "plan_embedding_2": plan_embed_2,
             "embedding1_model": "text-embedding-ada-002",
             "embedding2_model": "e5-base-v2",
             "success": True,
@@ -264,13 +308,13 @@ def create_plan_json(article_dict: Dict) -> Dict:
             "id": str(uuid4()),
             "title": title,
             "abstract": abstract,
-            "title_embedding_1": "???",
-            "title_embedding_2": "???",
-            "abstract_embedding_1": "???",
-            "abstract_embedding_2": "???",
+            "title_embedding_1": None,
+            "title_embedding_2": None,
+            "abstract_embedding_1": None,
+            "abstract_embedding_2": None,
             "plan": plan,
-            "plan_embedding_1": "???",
-            "plan_embedding_2": "???",
+            "plan_embedding_1": None,
+            "plan_embedding_2": None,
             "embedding1_model": "text-embedding-ada-002",
             "embedding2_model": "e5-base-v2",
             "success": False,
