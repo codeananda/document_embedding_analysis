@@ -373,6 +373,106 @@ def compare_content(plan_1: Dict, plan_2: Dict) -> Dict:
     pass
 
 
+def compare_documents(document: dict, prediction: dict, compare_on: str = "section"):
+    """Compare the 'compare_on' sections of document and prediction. Calculate MAUVE,
+    and ROUGE-L scores on the actual text, and cosine similarity on the embeddings.
+
+    Parameters
+    ----------
+    document : dict
+        Dictionary containing the grouth truth document. Must contain the keys
+        'plan' and 'id'.
+    prediction : dict
+        Dictionary containing the prediction to compare against. Must contain the keys
+        'plan' and 'id'.
+    compare_on : str, optional ['section', 'content']
+        Whether to compare on the 'section' level i.e. the plan of the document, or
+        the 'content' level.
+
+    """
+    if compare_on not in ["section", "content"]:
+        raise ValueError(
+            f"`compare_on` must be 'section' or 'content'. Received {compare_on}"
+        )
+
+    if not isinstance(document, dict) or not isinstance(prediction, dict):
+        raise TypeError(
+            "Both `document` and `prediction` must be dictionaries. Received "
+            f"{type(document)} and {type(prediction)}"
+        )
+
+    if "plan" not in document or "plan" not in prediction:
+        raise ValueError(
+            f'Both `document` and `prediction` must contain the key "plan". At least '
+            f"one of them does not."
+        )
+
+    mauve = load("mauve")
+    rouge = load("rouge")
+
+    section_results = []
+    predict_plan = prediction["plan"]
+    doc_plan = document["plan"]
+    for i, (p_dict, d_dict) in enumerate(zip(predict_plan, doc_plan), start=1):
+        idx = i
+        # Compute MAUVE
+        mauve_results = mauve.compute(
+            predictions=[p_dict["section"]], references=[d_dict["section"]]
+        )
+        mauve_score = mauve_results.mauve
+        # Compute ROUGE-L
+        results = rouge.compute(
+            predictions=[p_dict["section"]],
+            references=[d_dict["section"]],
+            rouge_types=["rougeL"],
+        )
+        rouge_score = results["rougeL"]
+        # Compute cosine distance between both section embeddings
+        cosine_1 = cosine_similarity(
+            [p_dict["section_embedding_1"]], [d_dict["section_embedding_1"]]
+        )[0][0]
+        cosine_2 = cosine_similarity(
+            [p_dict["section_embedding_2"]], [d_dict["section_embedding_2"]]
+        )[0][0]
+        # Combine results
+        result = {
+            "section_id": idx,
+            "mauve_similarity": mauve_score,
+            "rouge_L_similarity": rouge_score,
+            "embedding1_cosine_similarity": cosine_1,
+            "embedding2_cosine_similarity": cosine_2,
+        }
+        section_results.append(result)
+
+    # Calcualte total scores
+    mauve_total = np.mean([x["mauve_similarity"] for x in section_results])
+    rouge_total = np.mean([x["rouge_L_similarity"] for x in section_results])
+    cosine_1_total = np.mean(
+        [x["embedding1_cosine_similarity"] for x in section_results]
+    )
+    cosine_2_total = np.mean(
+        [x["embedding2_cosine_similarity"] for x in section_results]
+    )
+
+    total_results = {
+        "mauve_similarity": mauve_total,
+        "rouge_L_similarity": rouge_total,
+        "embedding1_cosine_similarity": cosine_1_total,
+        "embedding2_cosine_similarity": cosine_2_total,
+    }
+
+    if compare_on == "section":
+        compare_on = "plan"
+
+    output = {
+        "document_id": document["id"],
+        "prediction_id": prediction["id"],
+        f"{compare_on}_total_similarity": total_results,
+        f"{compare_on}_bysection_similarity": section_results,
+    }
+    return output
+
+
 async def main(url: str) -> Dict:
     """Given a Wikipedia URL, returns a dictionary with the title, abstract, plan and
     associated embeddings.
