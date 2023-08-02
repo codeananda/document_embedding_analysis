@@ -392,7 +392,7 @@ async def get_embeddings(
         embedder = OpenAIEmbeddings(model=model)
     elif model == "e5-base-v2":
         embedder = HuggingFaceEmbeddings(
-            model_name=model, encode_kwargs={"normalize_embeddings": True}
+            model_name=f"intfloat/{model}", encode_kwargs={"normalize_embeddings": True}
         )
     else:
         raise ValueError(
@@ -400,9 +400,15 @@ async def get_embeddings(
         )
 
     if isinstance(input, str):
-        return await embedder.aembed_query(input)
+        try:
+            return await embedder.aembed_query(input)
+        except NotImplementedError as e:
+            return embedder.embed_query(input)
     elif isinstance(input, list):
-        return await embedder.aembed_documents(input)
+        try:
+            return await embedder.aembed_documents(input)
+        except NotImplementedError as e:
+            return embedder.embed_documents(input)
     else:
         raise ValueError(
             f"Input must be a string or a list of strings. Received {type(input)}"
