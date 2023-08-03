@@ -25,7 +25,7 @@ _ = load_dotenv(find_dotenv())
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
-def num_tokens_from_string(string: str, encoding_name: str = "gpt-3.5-turbo") -> int:
+def _num_tokens_from_string(string: str, encoding_name: str = "gpt-3.5-turbo") -> int:
     """Returns the number of tokens in a text string."""
     try:
         encoding = tiktoken.get_encoding(encoding_name)
@@ -35,7 +35,7 @@ def num_tokens_from_string(string: str, encoding_name: str = "gpt-3.5-turbo") ->
     return num_tokens
 
 
-def extract_content_from_wikipedia_url(url: str) -> Dict[str, str]:
+def _extract_content_from_wikipedia_url(url: str) -> Dict[str, str]:
     """Extracts the content from a Wikipedia URL into a dictionary. The keys are the header
     names + indicator of header level e.g. 'h2 Definitions'. The values are the content
     underneath each header tags.
@@ -109,7 +109,7 @@ def extract_content_from_wikipedia_url(url: str) -> Dict[str, str]:
     return article_dict
 
 
-async def extract_title(string: str) -> str:
+async def _extract_title(string: str) -> str:
     """Extract a title from `string` that is max 7 words long."""
     doctran = Doctran(
         openai_api_key=os.getenv("OPENAI_API_KEY"), openai_model="gpt-3.5-turbo"
@@ -148,7 +148,7 @@ async def divide_sections_if_too_large(
         return result
 
     for heading, content in start_dict.items():
-        num_tokens = num_tokens_from_string(content)
+        num_tokens = _num_tokens_from_string(content)
         # Each section must contain something, otherwise the embedding models fail
         if num_tokens == 0:
             final_dict[heading] = " "
@@ -164,7 +164,7 @@ async def divide_sections_if_too_large(
                 # ' ' separator means sometimes sentences will be cut in two to ensure
                 # the chunk size is not exceeded
                 separators=["\n\n", "\n", " "],
-                length_function=num_tokens_from_string,
+                length_function=_num_tokens_from_string,
             )
             splits: List[str] = char_splitter.split_text(content)
             # Keep heading the same but add numbers to sections e.g. 'h2 Reference' -> 'h2 Reference 1'
@@ -178,7 +178,7 @@ async def divide_sections_if_too_large(
                 for split in splits:
                     # Headings are of the form h1, h2, h3 etc. we split it into more of the same level
                     heading_level = int(heading[1])
-                    title = await extract_title(split)
+                    title = await _extract_title(split)
                     new_heading = f"h{heading_level} {title}"
                     final_dict[new_heading] = split
                     logger.info(f"Added {new_heading} split original heading {heading}")
@@ -329,54 +329,6 @@ def generate_embeddings_plan_and_section_content(article_dict: Dict) -> Dict:
     return plan_json
 
 
-def compare_plans(plan_1: Dict, plan_2: Dict) -> Dict:
-    """Given two plans, returns a dictionary with the cosine similarity of the plans
-    and the similarity scores of the plans (comparing both embeddings and text).
-    """
-    # TODO - how to handle the full content of each plan? It's way too big.
-    plan_1_content: str = ...
-    plan_2_content: str = ...
-
-    # Mauve & Rouge have to compare the actual text strings themselves, not embeddings
-    mauve = load("mauve")
-    mauve_results = mauve.compute(
-        predictions=[plan_1_content], references=[plan_2_content]
-    )
-    mauve_similarity = mauve_results.mauve
-
-    rouge = load("rouge")
-    results = rouge.compute(
-        predictions=[plan_1_content],
-        references=[plan_2_content],
-        rouge_types=["rougeL"],
-    )
-    rouge_L_similarity = results["rougeL"]
-
-    cosine_1 = cosine_similarity(
-        [plan_1["plan_embedding_1"]], [plan_2["plan_embedding_1"]]
-    )[0][0]
-    cosine_2 = cosine_similarity(
-        [plan_1["plan_embedding_2"]], [plan_2["plan_embedding_2"]]
-    )[0][0]
-
-    comparison_dict = {
-        "document_id": str(uuid4()),
-        "prediction_id": str(uuid4()),
-        "plan_similarity": {
-            "embedding1_cosine_similarity": cosine_1,
-            "embedding2_cosine_similarity": cosine_2,
-            "mauve_similarity": mauve_similarity,
-            "rougeL_similarity": rouge_L_similarity,
-        },
-    }
-    return comparison_dict
-
-
-# TODO
-def compare_content(plan_1: Dict, plan_2: Dict) -> Dict:
-    pass
-
-
 async def get_embeddings(
     input: str | List[str], model: str = "text-embedding-ada-002"
 ) -> List[float] | List[List[float]]:
@@ -469,6 +421,7 @@ def _compare_documents(
     section_results = []
     predict_plan = prediction["plan"]
     doc_plan = document["plan"]
+    # If plans have differnet lengths, just goes up to shortest
     for i, (p_dict, d_dict) in enumerate(zip(predict_plan, doc_plan), start=1):
         idx = i
         # Compute MAUVE
@@ -573,7 +526,7 @@ async def extract_plan_and_content_wikipedia(url: str) -> Dict[str, Any]:
     >>> plan_json = asyncio.run(extract_plan_and_content_wikipedia(url))
     """
     start = time()
-    article_dict = extract_content_from_wikipedia_url(url)
+    article_dict = _extract_content_from_wikipedia_url(url)
     article_dict = await divide_sections_if_too_large(article_dict)
     plan_json = generate_embeddings_plan_and_section_content(article_dict)
     end = time()
