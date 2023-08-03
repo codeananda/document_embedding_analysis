@@ -559,6 +559,8 @@ def document_to_json_dataset(
     """This function takes the document path in, type, and a an output path, generate the
     JSON using all functions above, save it to an output if not null and return JSON.
     """
+    # TODO - what is document_type?
+    # TODO - could document_path_in be a url?
     pass
 
 
