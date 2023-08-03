@@ -102,7 +102,8 @@ def extract_content_from_wikipedia_url(url: str) -> Dict[str, str]:
     num_sections = len(article_dict.keys())
 
     logger.info(
-        f"Sucessfully downloaded content from Wikipedia page. Extracted {num_sections} sections."
+        f"Successfully downloaded content from Wikipedia page {url}. "
+        f"Extracted {num_sections} sections."
     )
 
     return article_dict
@@ -453,6 +454,15 @@ def _compare_documents(
             f"one of them does not."
         )
 
+    start = time()
+    doc1_name = f"ID: {document['id']} Title: {document['title']}"
+    doc2_name = f"ID: {prediction['id']} Title: {prediction['title']}"
+    logger.info(
+        f"\n\tStarting to compare two documents on {compare_on}:"
+        f"\n\t\t{doc1_name}"
+        f"\n\t\t{doc2_name}"
+    )
+
     mauve = load("mauve")
     rouge = load("rouge")
 
@@ -516,11 +526,19 @@ def _compare_documents(
         f"{compare_on}_total_similarity": total_results,
         f"{compare_on}_bysection_similarity": section_results,
     }
+
+    end = time()
+    seconds = end - start
+    mins = seconds / 60
+    logger.info(
+        f"\n\tFinished comparing two documents on {compare_on}:"
+        f"\n\t\tThat took: {mins:.2f} mins ({seconds:.0f} seconds)"
+    )
     return output
 
 
 def compare_documents_plans(
-    document1: Dict[str, Any], document2: Dict[str, Any], method: str
+    document1: Dict[str, Any], document2: Dict[str, Any], method: str = None
 ) -> Dict[str, float]:
     """This function takes two documents, a comparison method, compares the plans
     of the documents using the specified method, and returns a dictionary containing
@@ -531,7 +549,7 @@ def compare_documents_plans(
 
 
 def compare_documents_sections(
-    document1: Dict[str, Any], document2: Dict[str, Any], method: str
+    document1: Dict[str, Any], document2: Dict[str, Any], method: str = None
 ) -> Dict[str, Dict[str, float]]:
     """This function takes two documents, a comparison method, compares the sections
     of the documents using the specified method, and returns a dictionary containing
@@ -541,11 +559,14 @@ def compare_documents_sections(
     return _compare_documents(document1, document2, compare_on="content")
 
 
-async def extract_plan_and_content_wikipedia(url: str) -> Dict:
+async def extract_plan_and_content_wikipedia(url: str) -> Dict[str, Any]:
     """Given a Wikipedia URL, returns a dictionary with the title, abstract, plan and
     associated embeddings.
 
-    Note: due to the async nature of the function, it must be run using asyncio.run().
+    Note: due to the async nature of the function, it must be run using either asyncio.run()
+    if called from a script, or using `await` if called from another async function or jupyter
+    notebook.
+
     Example Usage:
     >>> import asyncio
     >>> url = "https://en.wikipedia.org/wiki/Dual-phase_evolution"
@@ -556,11 +577,11 @@ async def extract_plan_and_content_wikipedia(url: str) -> Dict:
     article_dict = await divide_sections_if_too_large(article_dict)
     plan_json = generate_embeddings_plan_and_section_content(article_dict)
     end = time()
-    seconds = round(end - start)
-    minutes = round(seconds / 60, 2)
+    seconds = end - start
+    minutes = seconds / 60
     logger.info(
         f"\n\tSuccessfully extracted plan and content for {url}"
-        f"\n\tTime taken: {minutes} min ({seconds}s)"
+        f"\n\tTime taken: {minutes:.2f} min ({seconds:.0f}s)"
     )
     return plan_json
 
