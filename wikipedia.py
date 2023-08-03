@@ -2,7 +2,7 @@ import asyncio
 import os
 from copy import copy
 from pprint import pprint
-from typing import List, Dict
+from typing import List, Dict, Any
 from uuid import uuid4
 from time import time
 
@@ -418,22 +418,23 @@ async def get_embeddings(
         )
 
 
-def compare_documents(document: dict, prediction: dict, compare_on: str = "section"):
+def _compare_documents(
+    document: Dict[str, Any], prediction: Dict[str, Any], compare_on: str = "section"
+):
     """Compare the 'compare_on' sections of document and prediction. Calculate MAUVE,
     and ROUGE-L scores on the actual text, and cosine similarity on the embeddings.
 
     Parameters
     ----------
-    document : dict
+    document : Dict[str, Any]
         Dictionary containing the grouth truth document. Must contain the keys
         'plan' and 'id'.
-    prediction : dict
+    prediction : Dict[str, Any]
         Dictionary containing the prediction to compare against. Must contain the keys
         'plan' and 'id'.
     compare_on : str, optional ['section', 'content']
         Whether to compare on the 'section' level i.e. the plan of the document, or
         the 'content' level.
-
     """
     if compare_on not in ["section", "content"]:
         raise ValueError(
@@ -516,6 +517,28 @@ def compare_documents(document: dict, prediction: dict, compare_on: str = "secti
         f"{compare_on}_bysection_similarity": section_results,
     }
     return output
+
+
+def compare_documents_plans(
+    document1: Dict[str, Any], document2: Dict[str, Any], method: str
+) -> Dict[str, float]:
+    """This function takes two documents, a comparison method, compares the plans
+    of the documents using the specified method, and returns a dictionary containing
+    the similarity scores.
+    """
+    # TODO - do we really need method? Or can we just do every metric every time?
+    return _compare_documents(document1, document2, compare_on="section")
+
+
+def compare_documents_sections(
+    document1: Dict[str, Any], document2: Dict[str, Any], method: str
+) -> Dict[str, Dict[str, float]]:
+    """This function takes two documents, a comparison method, compares the sections
+    of the documents using the specified method, and returns a dictionary containing
+    the section-wise similarity scores.
+    """
+    # TODO - do we really need method? Or can we just do every metric every time?
+    return _compare_documents(document1, document2, compare_on="content")
 
 
 async def extract_plan_and_content_wikipedia(url: str) -> Dict:
