@@ -521,6 +521,12 @@ def compare_documents(document: dict, prediction: dict, compare_on: str = "secti
 async def extract_plan_and_content_wikipedia(url: str) -> Dict:
     """Given a Wikipedia URL, returns a dictionary with the title, abstract, plan and
     associated embeddings.
+
+    Note: due to the async nature of the function, it must be run using asyncio.run().
+    Example Usage:
+    >>> import asyncio
+    >>> url = "https://en.wikipedia.org/wiki/Dual-phase_evolution"
+    >>> plan_json = asyncio.run(extract_plan_and_content_wikipedia(url))
     """
     start = time()
     article_dict = extract_content_from_wikipedia_url(url)
