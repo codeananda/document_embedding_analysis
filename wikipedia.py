@@ -496,6 +496,13 @@ def compare_documents_plans(
     """This function takes two documents, a comparison method, compares the plans
     of the documents using the specified method, and returns a dictionary containing
     the similarity scores.
+
+    Example Usage:
+    >>> url_1 = 'https://en.wikipedia.org/wiki/Simulated_annealing'
+    >>> url_2 = 'https://en.wikipedia.org/wiki/Dual-phase_evolution'
+    >>> doc_1 = await extract_plan_and_content_wikipedia(url_1)
+    >>> doc_2 = await extract_plan_and_content_wikipedia(url_2)
+    >>> compare_plan = compare_documents_plans(doc_1, doc_2, None)
     """
     # TODO - do we really need method? Or can we just do every metric every time?
     return _compare_documents(document1, document2, compare_on="section")
@@ -507,6 +514,13 @@ def compare_documents_sections(
     """This function takes two documents, a comparison method, compares the sections
     of the documents using the specified method, and returns a dictionary containing
     the section-wise similarity scores.
+
+    Example Usage:
+    >>> url_1 = 'https://en.wikipedia.org/wiki/Simulated_annealing'
+    >>> url_2 = 'https://en.wikipedia.org/wiki/Dual-phase_evolution'
+    >>> doc_1 = await extract_plan_and_content_wikipedia(url_1)
+    >>> doc_2 = await extract_plan_and_content_wikipedia(url_2)
+    >>> compare_sections = compare_documents_sections(doc_1, doc_2, None)
     """
     # TODO - do we really need method? Or can we just do every metric every time?
     return _compare_documents(document1, document2, compare_on="content")
@@ -537,6 +551,23 @@ async def extract_plan_and_content_wikipedia(url: str) -> Dict[str, Any]:
         f"\n\tTime taken: {minutes:.2f} min ({seconds:.0f}s)"
     )
     return plan_json
+
+
+def document_to_json_dataset(
+    document_path_in: str, document_type: str, json_path_out: str
+) -> None:
+    """This function takes the document path in, type, and a an output path, generate the
+    JSON using all functions above, save it to an output if not null and return JSON.
+    """
+    pass
+
+
+def documents_to_json_datasets(
+    documents: List[Dict[str, Any]], json_path_out: str
+) -> None:
+    """Convert a list of documents to JSON datasets using functions above, saves it as
+    an aggregated JSON file"""
+    pass
 
 
 if __name__ == "__main__":
