@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 from collections import defaultdict
 from copy import copy
@@ -78,6 +79,7 @@ def load_patent_file(patent_file: str | Path) -> Dict[str, str]:
         'descr', 'claim_1', 'claim_2', ..., 'claim_n', 'pdfep']. Not all patents
         will have all keys. All will have 'title' at a minimum.
     """
+    logger.info(f"Loading patent file: {patent_file}")
     # Read file
     with open(patent_file, "r") as f:
         lines: list = f.readlines()
@@ -345,22 +347,53 @@ def _gen_embed_plan(plan: List[dict], i: int) -> List[float]:
     return total_mean
 
 
-def generate_embeddings_plan_and_section_content(article_dict: Dict) -> Dict:
+def generate_embeddings_plan_and_section_content(
+    article_dict: Dict, doc_type: str = "patent"
+) -> Dict:
     """Given a dictionary of the article content, returns a dictionary with the title,
     abstract, plan and associated embeddings.
     """
+    if doc_type not in ["patent", "wikipedia", "arxiv"]:
+        raise ValueError(
+            f"doc_type must be one of 'patent', 'wikipedia', or 'arxiv'. Got {doc_type}."
+        )
     logger.info("Creating plan json")
     headings = list(article_dict.keys())
     content = list(article_dict.values())
 
-    title = headings[0][3:]
-    abstract = content[0]
-    total_sections = len(headings) - 1
+    if doc_type == "wikipedia":
+        # First key/value pair in wikipedia dict is {title: abstract}. So we can take
+        # the first heading and first content
+
+        # Wikipedia titles are of form 'h1 Example' so we remove the 'h1 '
+        title = headings[0][3:]
+        abstract = content[0]
+        total_sections = len(headings) - 1
+        start_index = 1
+    elif doc_type == "patent":
+        # First key/value pairs in patent dict are {'title': title, 'abstract': abstract}
+        # so we take the first two elements of content
+
+        # Titles are separated by tabs, the last element is the actual title
+        title = content[0].split("\t")[-1].strip()
+        # Remove illegal characters from title (it's used as a filename)
+        title = "".join(i for i in title if i not in "\/:*?<>|")
+        abstract = content[1]
+        total_sections = len(headings) - 2
+        start_index = 2
+    elif doc_type == "arxiv":
+        raise NotImplementedError("Arxiv not yet implemented")
+
+    logger.info("Title: " + title)
+    logger.info("Abstract: " + abstract)
+
     plan = [
         _gen_embed_section_content(
             heading, content, id=i, total_sections=total_sections
         )
-        for i, (heading, content) in enumerate(zip(headings[1:], content[1:]), start=1)
+        for i, (heading, content) in enumerate(
+            zip(headings[start_index:], content[start_index:]), start=start_index
+        )
     ]
     plan_embed_1 = _gen_embed_plan(plan, 1)
     plan_embed_2 = _gen_embed_plan(plan, 2)
@@ -622,24 +655,53 @@ async def extract_plan_and_content_wikipedia(url: str) -> Dict[str, Any]:
     >>> url = "https://en.wikipedia.org/wiki/Dual-phase_evolution"
     >>> plan_json = asyncio.run(extract_plan_and_content_wikipedia(url))
     """
+    logger.info(f"\n\tExtracting plan and content for wikipedia page: {url}")
     start = time()
     article_dict = _extract_content_from_wikipedia_url(url)
     article_dict = await divide_sections_if_too_large(
         article_dict, doc_type="wikipedia"
     )
-    plan_json = generate_embeddings_plan_and_section_content(article_dict)
-    end = time()
-    seconds = end - start
-    minutes = seconds / 60
+    plan_json = generate_embeddings_plan_and_section_content(
+        article_dict, doc_type="wikipedia"
+    )
+    output_file = Path(f"{plan_json['title']}.json")
+    with open(output_file, "w") as file:
+        json.dump(plan_json, file, indent=4)
+    minutes, seconds = divmod(round(time() - start, 3), 60)
+    elapsed = (
+        f"{str(int(minutes)) + 'mins' if minutes else ''}"
+        f" {str(round(seconds, 1)) + 's'}"
+    )
     logger.info(
         f"\n\tSuccessfully extracted plan and content for {url}"
-        f"\n\tTime taken: {minutes:.2f} min ({seconds:.0f}s)"
+        f"\n\tWritten to file: {output_file.absolute()}"
+        f"\n\tTime taken: {elapsed}"
     )
     return plan_json
 
 
-async def extract_plan_and_content_patent(url: str) -> Dict[str, Any]:
-    pass
+async def extract_plan_and_content_patent(patent_file: str | Path) -> Dict[str, Any]:
+    logger.info(f"\n\tExtracting plan and content for patent: {patent_file}")
+    start = time()
+    patent_dict = load_patent_file(patent_file)
+    patent_dict = await divide_sections_if_too_large(patent_dict, doc_type="patent")
+    plan_json = generate_embeddings_plan_and_section_content(
+        patent_dict, doc_type="patent"
+    )
+    output_file = Path(f"{plan_json['title']}.json")
+    with open(output_file, "w") as file:
+        json.dump(plan_json, file, indent=4)
+    minutes, seconds = divmod(round(time() - start, 3), 60)
+    elapsed = (
+        f"{str(int(minutes)) + 'mins' if minutes else ''}"
+        f" {str(round(seconds, 1)) + 's'}"
+    )
+    logger.info(
+        f"\n\tSuccessfully extracted plan and content for {patent_file}"
+        f"\n\tWritten to file: {output_file.absolute()}"
+        f"\n\tTime taken: {elapsed}"
+    )
+    return plan_json
 
 
 def document_to_json_dataset(
