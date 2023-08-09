@@ -125,14 +125,20 @@ async def _extract_title(string: str) -> str:
     return document.transformed_content
 
 
-async def divide_sections_if_too_large_wiki(
-    article_dict: Dict[str, str], max_section_length: int = 512
+async def divide_sections_if_too_large(
+    article_dict: Dict[str, str],
+    max_section_length: int = 512,
+    doc_type: str = "patent",
 ) -> Dict[str, str]:
     """This function takes an existing dictionary containing the plan and sections
     content (from above functions), checks if any section is too large (i.e., more
     than 512 tokens), divides such sections into smaller sections, generates a new
     title, and returns the updated dictionary
     """
+    if doc_type not in ["patent", "wikipedia", "arxiv"]:
+        raise ValueError(
+            f"doc_type must be one of 'patent', 'wikipedia', or 'arxiv'. Got {doc_type}."
+        )
     logger.info("Dividing sections if too large in plan and section content.")
     final_dict: Dict = {}
     start_dict = copy(article_dict)
@@ -168,24 +174,25 @@ async def divide_sections_if_too_large_wiki(
             )
             splits: List[str] = char_splitter.split_text(content)
             # Keep heading the same but add numbers to sections e.g. 'h2 Reference' -> 'h2 Reference 1'
-            if is_reference_section(heading):
+            if doc_type == "wikipedia" and is_reference_section(heading):
                 for i, split in enumerate(splits, start=1):
                     new_heading = f"{heading} {i}"
                     final_dict[new_heading] = split
                     logger.info(
                         f"Added '{new_heading}' split original heading '{heading}'"
                     )
-            # Split heading into more of the same level and add new title
-            else:
-                for split in splits:
-                    # Headings are of the form h1, h2, h3 etc. we split it into more of the same level
+            # Create new titles for each split
+            for split in splits:
+                # Headings are of the form h1, h2, h3 etc. we split it into more of the same level
+                if doc_type == "wikipedia":
                     heading_level = int(heading[1])
                     title = await _extract_title(split)
                     new_heading = f"h{heading_level} {title}"
-                    final_dict[new_heading] = split
-                    logger.info(
-                        f"Added '{new_heading}' split original heading '{heading}'"
-                    )
+                # Heading levels aren't important for other doc_types
+                else:
+                    new_heading = await _extract_title(split)
+                final_dict[new_heading] = split
+                logger.info(f"Added '{new_heading}' split original heading '{heading}'")
 
     n_keys_start = len(start_dict.keys())
     n_keys_final = len(final_dict.keys())
@@ -545,7 +552,9 @@ async def extract_plan_and_content_wikipedia(url: str) -> Dict[str, Any]:
     """
     start = time()
     article_dict = _extract_content_from_wikipedia_url(url)
-    article_dict = await divide_sections_if_too_large_wiki(article_dict)
+    article_dict = await divide_sections_if_too_large(
+        article_dict, doc_type="wikipedia"
+    )
     plan_json = generate_embeddings_plan_and_section_content(article_dict)
     end = time()
     seconds = end - start
@@ -555,6 +564,9 @@ async def extract_plan_and_content_wikipedia(url: str) -> Dict[str, Any]:
         f"\n\tTime taken: {minutes:.2f} min ({seconds:.0f}s)"
     )
     return plan_json
+
+async def extract_plan_and_content_patent(url: str) -> Dict[str, Any]:
+    pass
 
 
 def document_to_json_dataset(
