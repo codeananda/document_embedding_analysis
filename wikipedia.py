@@ -1,6 +1,8 @@
 import asyncio
 import os
+from collections import defaultdict
 from copy import copy
+from pathlib import Path
 from pprint import pprint
 from typing import List, Dict, Any
 from uuid import uuid4
@@ -33,6 +35,76 @@ def _num_tokens_from_string(string: str, encoding_name: str = "gpt-3.5-turbo") -
         encoding = tiktoken.encoding_for_model(encoding_name)
     num_tokens = len(encoding.encode(string))
     return num_tokens
+
+
+def split_patents_into_individual_files(patents_file: str | Path) -> None:
+    """Read in a file containing many patents. Split each patent into its own file, keeping
+    only the english parts, and write to disk."""
+    # Read in file
+    with open(patents_file, "r") as f:
+        lines = f.readlines()
+    # Get all eng sections
+    lines_en = [line for line in lines if "\ten\t" in line]
+    # Split each on TITLE and write to its own file with TITLE as filename
+    os.makedirs("data/patents", exist_ok=True)
+    title = "no title found"
+    # Create dict of patents
+    patents: defaultdict = defaultdict(str)
+    for i, x in enumerate(lines_en):
+        if "\tTITLE\t" in x:
+            title = x.split("\t")[-1].strip()
+        patents[title] += x
+
+    # Write each patent to its own file
+    for title, content in patents.items():
+        filename_friendly_title = "".join(i for i in title if i not in "\/:*?<>|")
+        with open(f"data/patents/{filename_friendly_title}.txt", "w") as f:
+            f.write(content)
+            logger.info(f"Wrote file: {filename_friendly_title}.txt")
+
+
+def load_patent_file(patent_file: str | Path) -> Dict[str, str]:
+    """Read in a patent file and return a dict with keys as section titles and values the content.
+
+    Parameters
+    ----------
+    patent_file : str
+        Path to the patent file.
+
+    Returns
+    -------
+    patent_dict : dict
+        Dict with keys as section titles and values the content. Keys are ['title',
+        'descr', 'claim_1', 'claim_2', ..., 'claim_n', 'pdfep']. Not all patents
+        will have all keys. All will have 'title' at a minimum.
+    """
+    # Read file
+    with open(patent_file, "r") as f:
+        lines: list = f.readlines()
+
+    # Get all english sections
+    lines_en: list = [line for line in lines if "\ten\t" in line]
+
+    # Convert into dict with keys as section titles and values the content
+    patent_dict = {}
+    total_claims = 1
+    for x in lines_en:
+        if "\tTITLE\t" in x:
+            patent_dict["title"] = x
+        elif "\tDESCR\t" in x:
+            patent_dict["descr"] = x
+        elif "\tCLAIM\t" in x:
+            # Some patents have multiple claims, so we need to number them
+            patent_dict[f"claim_{total_claims}"] = x
+            total_claims += 1
+        elif "\tPDFEP" in x:
+            patent_dict["pdfep"] = x
+        else:
+            raise ValueError(
+                f"Expected sections in [TITLE, DESCR, CLAIM, PDFEP]. Received: {x}"
+            )
+
+    return patent_dict
 
 
 def _extract_content_from_wikipedia_url(url: str) -> Dict[str, str]:
@@ -564,6 +636,7 @@ async def extract_plan_and_content_wikipedia(url: str) -> Dict[str, Any]:
         f"\n\tTime taken: {minutes:.2f} min ({seconds:.0f}s)"
     )
     return plan_json
+
 
 async def extract_plan_and_content_patent(url: str) -> Dict[str, Any]:
     pass
