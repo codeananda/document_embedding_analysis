@@ -38,6 +38,30 @@ def _num_tokens_from_string(string: str, encoding_name: str = "gpt-3.5-turbo") -
     return num_tokens
 
 
+def truncated_pprint(obj, N=5):
+    """Pretty print an object, truncating lists and strings to N items/characters
+    for easier viewing of plan_json objects"""
+
+    def truncate(item, N):
+        if isinstance(item, list) and N is not None:
+            return item[:N] + (["..."] if len(item) > N else [])
+        if isinstance(item, str) and N is not None:
+            N = 125
+            return item[:N] + ("..." if len(item) > N else "")
+        return item
+
+    def trunc_recursive(item, N):
+        if isinstance(item, list):
+            return [trunc_recursive(i, N) for i in truncate(item, N)]
+        elif isinstance(item, dict):
+            return {k: trunc_recursive(v, N) for k, v in item.items()}
+        else:
+            return truncate(item, N)
+
+    truncated_obj = trunc_recursive(obj, N)
+    pprint(truncated_obj, sort_dicts=False)
+
+
 def split_patents_into_individual_files(patents_file: str | Path) -> None:
     """Read in a file containing many patents. Split each patent into its own file, keeping
     only the english parts, and write to disk."""
