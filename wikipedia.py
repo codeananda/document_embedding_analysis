@@ -125,7 +125,7 @@ async def _extract_title(string: str) -> str:
     return document.transformed_content
 
 
-async def divide_sections_if_too_large(
+async def divide_sections_if_too_large_wiki(
     article_dict: Dict[str, str], max_section_length: int = 512
 ) -> Dict[str, str]:
     """This function takes an existing dictionary containing the plan and sections
@@ -172,7 +172,9 @@ async def divide_sections_if_too_large(
                 for i, split in enumerate(splits, start=1):
                     new_heading = f"{heading} {i}"
                     final_dict[new_heading] = split
-                    logger.info(f"Added {new_heading} split original heading {heading}")
+                    logger.info(
+                        f"Added '{new_heading}' split original heading '{heading}'"
+                    )
             # Split heading into more of the same level and add new title
             else:
                 for split in splits:
@@ -181,7 +183,9 @@ async def divide_sections_if_too_large(
                     title = await _extract_title(split)
                     new_heading = f"h{heading_level} {title}"
                     final_dict[new_heading] = split
-                    logger.info(f"Added {new_heading} split original heading {heading}")
+                    logger.info(
+                        f"Added '{new_heading}' split original heading '{heading}'"
+                    )
 
     n_keys_start = len(start_dict.keys())
     n_keys_final = len(final_dict.keys())
@@ -541,7 +545,7 @@ async def extract_plan_and_content_wikipedia(url: str) -> Dict[str, Any]:
     """
     start = time()
     article_dict = _extract_content_from_wikipedia_url(url)
-    article_dict = await divide_sections_if_too_large(article_dict)
+    article_dict = await divide_sections_if_too_large_wiki(article_dict)
     plan_json = generate_embeddings_plan_and_section_content(article_dict)
     end = time()
     seconds = end - start
