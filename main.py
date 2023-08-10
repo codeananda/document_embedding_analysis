@@ -181,7 +181,7 @@ def load_patent_file(patent_file: str | Path) -> Dict[str, str]:
     return patent_dict
 
 
-def _extract_content_from_wikipedia_url(url: str) -> Dict[str, str]:
+def load_wikipedia_url(url: str) -> Dict[str, str]:
     """Extracts the content from a Wikipedia URL into a dictionary. The keys are the header
     names + indicator of header level e.g. 'h2 Definitions'. The values are the content
     underneath each header tags.
@@ -727,16 +727,25 @@ def compare_documents_sections(
     return _compare_documents(document1, document2, compare_on="content")
 
 
-async def extract_plan_and_content_arxiv(path: str | Path) -> Dict[str, Any]:
-    logger.info(f"\n\tExtracting plan and content for arxiv paper: {path}")
+async def _extract_plan_and_content(input: str | Path, doc_type: str) -> Dict[str, Any]:
+    logger.info(f"\n\tExtracting plan and content for: {input}")
     start = time()
-    article_dict = load_arxiv_paper(path)
-    article_dict = await divide_sections_if_too_large(article_dict, doc_type="arxiv")
+    if doc_type == "wikipedia":
+        article_dict = load_wikipedia_url(input)
+    elif doc_type == "arxiv":
+        article_dict = load_arxiv_paper(input)
+    elif doc_type == "patent":
+        article_dict = load_patent_file(input)
+    else:
+        raise ValueError(
+            f"doc_type must be one of 'patent', 'wikipedia', or 'arxiv'. "
+            f"Received {doc_type}"
+        )
+
+    article_dict = await divide_sections_if_too_large(article_dict, doc_type=doc_type)
     plan_json = generate_embeddings_plan_and_section_content(
-        article_dict, doc_type="arxiv"
+        article_dict, doc_type=doc_type
     )
-    print("Truncated plan_json:")
-    truncated_pprint(plan_json)
     output_file = Path(f"{plan_json['title']}.json")
     with open(output_file, "w") as file:
         json.dump(plan_json, file, indent=4)
@@ -746,11 +755,15 @@ async def extract_plan_and_content_arxiv(path: str | Path) -> Dict[str, Any]:
         f" {str(round(seconds, 1)) + 's'}"
     )
     logger.info(
-        f"\n\tSuccessfully extracted plan and content for {path}"
+        f"\n\tSuccessfully extracted plan and content for {input}"
         f"\n\tWritten to file: {output_file.absolute()}"
         f"\n\tTime taken: {elapsed}"
     )
     return plan_json
+
+
+async def extract_plan_and_content_arxiv(path: str | Path) -> Dict[str, Any]:
+    return await _extract_plan_and_content(path, doc_type="arxiv")
 
 
 async def extract_plan_and_content_wikipedia(url: str) -> Dict[str, Any]:
@@ -766,53 +779,11 @@ async def extract_plan_and_content_wikipedia(url: str) -> Dict[str, Any]:
     >>> url = "https://en.wikipedia.org/wiki/Dual-phase_evolution"
     >>> plan_json = asyncio.run(extract_plan_and_content_wikipedia(url))
     """
-    logger.info(f"\n\tExtracting plan and content for wikipedia page: {url}")
-    start = time()
-    article_dict = _extract_content_from_wikipedia_url(url)
-    article_dict = await divide_sections_if_too_large(
-        article_dict, doc_type="wikipedia"
-    )
-    plan_json = generate_embeddings_plan_and_section_content(
-        article_dict, doc_type="wikipedia"
-    )
-    output_file = Path(f"{plan_json['title']}.json")
-    with open(output_file, "w") as file:
-        json.dump(plan_json, file, indent=4)
-    minutes, seconds = divmod(round(time() - start, 3), 60)
-    elapsed = (
-        f"{str(int(minutes)) + 'mins' if minutes else ''}"
-        f" {str(round(seconds, 1)) + 's'}"
-    )
-    logger.info(
-        f"\n\tSuccessfully extracted plan and content for {url}"
-        f"\n\tWritten to file: {output_file.absolute()}"
-        f"\n\tTime taken: {elapsed}"
-    )
-    return plan_json
+    return await _extract_plan_and_content(url, doc_type="wikipedia")
 
 
 async def extract_plan_and_content_patent(patent_file: str | Path) -> Dict[str, Any]:
-    logger.info(f"\n\tExtracting plan and content for patent: {patent_file}")
-    start = time()
-    patent_dict = load_patent_file(patent_file)
-    patent_dict = await divide_sections_if_too_large(patent_dict, doc_type="patent")
-    plan_json = generate_embeddings_plan_and_section_content(
-        patent_dict, doc_type="patent"
-    )
-    output_file = Path(f"{plan_json['title']}.json")
-    with open(output_file, "w") as file:
-        json.dump(plan_json, file, indent=4)
-    minutes, seconds = divmod(round(time() - start, 3), 60)
-    elapsed = (
-        f"{str(int(minutes)) + 'mins' if minutes else ''}"
-        f" {str(round(seconds, 1)) + 's'}"
-    )
-    logger.info(
-        f"\n\tSuccessfully extracted plan and content for {patent_file}"
-        f"\n\tWritten to file: {output_file.absolute()}"
-        f"\n\tTime taken: {elapsed}"
-    )
-    return plan_json
+    return await _extract_plan_and_content(patent_file, doc_type="patent")
 
 
 def document_to_json_dataset(
