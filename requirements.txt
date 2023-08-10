@@ -14,3 +14,4 @@ absl-py
 loguru
 scikit-learn
 numpy
+pdfminer.six
