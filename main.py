@@ -272,25 +272,29 @@ async def divide_sections_if_too_large(
             )
             splits: List[str] = char_splitter.split_text(content)
             # Keep heading the same but add numbers to sections e.g. 'h2 Reference' -> 'h2 Reference 1'
-            if doc_type == "wikipedia" and is_reference_section(heading):
+            # TODO - add a continue statement here?
+            if doc_type in ["wikipedia", "arxiv"] and is_reference_section(heading):
                 for i, split in enumerate(splits, start=1):
                     new_heading = f"{heading} {i}"
                     final_dict[new_heading] = split
                     logger.info(
                         f"Added '{new_heading}' split original heading '{heading}'"
                     )
-            # Create new titles for each split
-            for split in splits:
-                # Headings are of the form h1, h2, h3 etc. we split it into more of the same level
-                if doc_type == "wikipedia":
-                    heading_level = int(heading[1])
-                    title = await _extract_title(split)
-                    new_heading = f"h{heading_level} {title}"
-                # Heading levels aren't important for other doc_types
-                else:
-                    new_heading = await _extract_title(split)
-                final_dict[new_heading] = split
-                logger.info(f"Added '{new_heading}' split original heading '{heading}'")
+            else:
+                # Create new titles for each split
+                for split in splits:
+                    # Headings are of the form h1, h2, h3 etc. we split it into more of the same level
+                    if doc_type == "wikipedia":
+                        heading_level = int(heading[1])
+                        title = await _extract_title(split)
+                        new_heading = f"h{heading_level} {title}"
+                    # Heading levels aren't important for other doc_types
+                    else:
+                        new_heading = await _extract_title(split)
+                    final_dict[new_heading] = split
+                    logger.info(
+                        f"Added '{new_heading}' split original heading '{heading}'"
+                    )
 
     n_keys_start = len(start_dict.keys())
     n_keys_final = len(final_dict.keys())
