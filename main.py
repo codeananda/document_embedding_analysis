@@ -730,6 +730,7 @@ def compare_documents_sections(
 async def _extract_plan_and_content(input: str | Path, doc_type: str) -> Dict[str, Any]:
     logger.info(f"\n\tExtracting plan and content for: {input}")
     start = time()
+    # Load depending on doc_type
     if doc_type == "wikipedia":
         article_dict = load_wikipedia_url(input)
     elif doc_type == "arxiv":
@@ -741,14 +742,18 @@ async def _extract_plan_and_content(input: str | Path, doc_type: str) -> Dict[st
             f"doc_type must be one of 'patent', 'wikipedia', or 'arxiv'. "
             f"Received {doc_type}"
         )
-
+    # Divide and create embeddings
     article_dict = await divide_sections_if_too_large(article_dict, doc_type=doc_type)
     plan_json = generate_embeddings_plan_and_section_content(
         article_dict, doc_type=doc_type
     )
-    output_file = Path(f"{plan_json['title']}.json")
+    # Write to file
+    output_dir = Path(f"output/{doc_type}")
+    os.makedirs(output_dir, exist_ok=True)
+    output_file = output_dir / Path(f"{plan_json['title']}.json")
     with open(output_file, "w") as file:
         json.dump(plan_json, file, indent=4)
+    # Calculate time taken
     minutes, seconds = divmod(round(time() - start, 3), 60)
     elapsed = (
         f"{str(int(minutes)) + 'mins' if minutes else ''}"
@@ -787,12 +792,12 @@ async def extract_plan_and_content_patent(patent_file: str | Path) -> Dict[str, 
 
 
 def document_to_json_dataset(
-    document_path_in: str, document_type: str, json_path_out: str
+    document_path_in: str, doc_type: str, json_path_out: str
 ) -> None:
     """This function takes the document path in, type, and a an output path, generate the
     JSON using all functions above, save it to an output if not null and return JSON.
     """
-    # TODO - what is document_type? wikipedia_article, arxiv, patent
+    # TODO - what is doc_type? wikipedia_article, arxiv, patent
     # TODO - could document_path_in be a url?
     pass
 
@@ -806,7 +811,26 @@ def documents_to_json_datasets(
 
 
 if __name__ == "__main__":
-    url = "https://en.wikipedia.org/wiki/Dual-phase_evolution"
-    # url = "https://en.wikipedia.org/wiki/Self-driving_car"
-    plan_json = asyncio.run(extract_plan_and_content_wikipedia(url))
-    # pprint(plan_json, sort_dicts=False)
+    wikipedia_articles = [
+        "https://en.wikipedia.org/wiki/Large_language_model",
+        "https://en.wikipedia.org/wiki/Transformer_(machine_learning_model)",
+        "https://en.wikipedia.org/wiki/Dual-phase_evolution",
+        "https://en.wikipedia.org/wiki/Simulated_annealing",
+        "https://en.wikipedia.org/wiki/Tessellation",
+        "https://en.wikipedia.org/wiki/Climate_change",
+        "https://en.wikipedia.org/wiki/DNA_nanotechnology",
+        "https://en.wikipedia.org/wiki/Self-driving_car",
+        "https://en.wikipedia.org/wiki/Unmanned_aerial_vehicle",
+        "https://en.wikipedia.org/wiki/2022%E2%80%932023_food_crises",
+        "https://en.wikipedia.org/wiki/Economic_impacts_of_climate_change",
+    ]
+    for wiki in wikipedia_articles:
+        asyncio.run(extract_plan_and_content_wikipedia(wiki))
+
+    patents = list(Path("data/patents").glob("*"))
+    for patent in patents:
+        asyncio.run(extract_plan_and_content_patent(patent))
+
+    arxiv = list(Path("data/arxiv").glob("*"))
+    for arx in arxiv:
+        asyncio.run(extract_plan_and_content_arxiv(arx))
