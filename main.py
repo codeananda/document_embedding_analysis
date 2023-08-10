@@ -1,13 +1,14 @@
 import asyncio
 import json
 import os
+import re
 from collections import defaultdict
 from copy import copy
 from pathlib import Path
 from pprint import pprint
+from time import time
 from typing import List, Dict, Any
 from uuid import uuid4
-from time import time
 
 import numpy as np
 import openai
@@ -22,6 +23,7 @@ from langchain.text_splitter import (
     RecursiveCharacterTextSplitter,
 )
 from loguru import logger
+from pdfminer.high_level import extract_text
 from sklearn.metrics.pairwise import cosine_similarity
 
 _ = load_dotenv(find_dotenv())
@@ -60,6 +62,52 @@ def truncated_pprint(obj, N=5):
 
     truncated_obj = trunc_recursive(obj, N)
     pprint(truncated_obj, sort_dicts=False)
+
+
+def load_arxiv_paper(path: str | Path) -> Dict[str, str]:
+    doc = Path(path)
+    # Extract all text from pdf
+    text = extract_text(doc)
+
+    title = doc.stem
+    title = title.replace("_", " ")
+
+    # The pattern searches for "abstract" followed by any content.
+    # Then, it looks for one of the potential following sections:
+    # "I. Introduction", "1. Introduction", or "Contents".
+    # We use a positive lookahead (?=...) to assert that the introduction or contents
+    # pattern exists, but we don't include it in the main match.
+    pattern = r"abstract(.*?)(?=(i\. introduction|1\. introduction|contents))"
+
+    # The re.DOTALL flag allows the . in the pattern to match newline characters,
+    match = re.search(pattern, text.lower(), re.DOTALL)
+
+    abstract = ""
+    abstract_end = 0
+    if match:
+        abstract_end = match.end()
+        abstract = match.group(1).strip()
+
+    # Extract references section
+    pattern = r"references\n"
+    matches = [match for match in re.finditer(pattern, text.lower())]
+
+    references = ""
+    reference_start = len(text)
+    if matches:
+        final_match = matches[-1]
+        reference_start = final_match.start()
+        references = text[reference_start:]
+
+    content = text[abstract_end:reference_start]
+
+    article_dict = {
+        "Title": title,
+        "Abstract": abstract,
+        "Content": content,
+        "References": references,
+    }
+    return article_dict
 
 
 def split_patents_into_individual_files(patents_file: str | Path) -> None:
@@ -381,10 +429,12 @@ def generate_embeddings_plan_and_section_content(
     """Given a dictionary of the article content, returns a dictionary with the title,
     abstract, plan and associated embeddings.
     """
+    doc_type_error_msg = (
+        f"doc_type must be one of 'patent', 'wikipedia', or 'arxiv'. "
+        f"Received {doc_type}"
+    )
     if doc_type not in ["patent", "wikipedia", "arxiv"]:
-        raise ValueError(
-            f"doc_type must be one of 'patent', 'wikipedia', or 'arxiv'. Got {doc_type}."
-        )
+        raise ValueError(doc_type_error_msg)
     logger.info("Creating plan json")
     headings = list(article_dict.keys())
     content = list(article_dict.values())
@@ -410,7 +460,14 @@ def generate_embeddings_plan_and_section_content(
         total_sections = len(headings) - 2
         start_index = 2
     elif doc_type == "arxiv":
-        raise NotImplementedError("Arxiv not yet implemented")
+        # The first key/value pairs in arxiv dicts are {'Title': title, 'Abstract': abstract}
+        # so we take the first two elements of content
+        title = content[0]
+        abstract = content[1]
+        total_sections = len(headings) - 2
+        start_index = 2
+    else:
+        raise ValueError(doc_type_error_msg)
 
     logger.info("Title: " + title)
     logger.info("Abstract: " + abstract)
@@ -420,7 +477,7 @@ def generate_embeddings_plan_and_section_content(
             heading, content, id=i, total_sections=total_sections
         )
         for i, (heading, content) in enumerate(
-            zip(headings[start_index:], content[start_index:]), start=start_index
+            zip(headings[start_index:], content[start_index:]), start=1
         )
     ]
     plan_embed_1 = _gen_embed_plan(plan, 1)
@@ -668,6 +725,32 @@ def compare_documents_sections(
     """
     # TODO - do we really need method? Or can we just do every metric every time?
     return _compare_documents(document1, document2, compare_on="content")
+
+
+async def extract_plan_and_content_arxiv(path: str | Path) -> Dict[str, Any]:
+    logger.info(f"\n\tExtracting plan and content for arxiv paper: {path}")
+    start = time()
+    article_dict = load_arxiv_paper(path)
+    article_dict = await divide_sections_if_too_large(article_dict, doc_type="arxiv")
+    plan_json = generate_embeddings_plan_and_section_content(
+        article_dict, doc_type="arxiv"
+    )
+    print("Truncated plan_json:")
+    truncated_pprint(plan_json)
+    output_file = Path(f"{plan_json['title']}.json")
+    with open(output_file, "w") as file:
+        json.dump(plan_json, file, indent=4)
+    minutes, seconds = divmod(round(time() - start, 3), 60)
+    elapsed = (
+        f"{str(int(minutes)) + 'mins' if minutes else ''}"
+        f" {str(round(seconds, 1)) + 's'}"
+    )
+    logger.info(
+        f"\n\tSuccessfully extracted plan and content for {path}"
+        f"\n\tWritten to file: {output_file.absolute()}"
+        f"\n\tTime taken: {elapsed}"
+    )
+    return plan_json
 
 
 async def extract_plan_and_content_wikipedia(url: str) -> Dict[str, Any]:
