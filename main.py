@@ -648,22 +648,22 @@ def _compare_documents(
     for idx, (p_dict, d_dict) in enumerate(zip(predict_plan, doc_plan), start=1):
         # Compute MAUVE
         mauve_results = mauve.compute(
-            predictions=[p_dict["section"]], references=[d_dict["section"]]
+            predictions=[p_dict[compare_on]], references=[d_dict[compare_on]]
         )
         mauve_score = mauve_results.mauve
         # Compute ROUGE-L
         results = rouge.compute(
-            predictions=[p_dict["section"]],
-            references=[d_dict["section"]],
+            predictions=[p_dict[compare_on]],
+            references=[d_dict[compare_on]],
             rouge_types=["rougeL"],
         )
         rouge_score = results["rougeL"]
         # Compute cosine distance between both section embeddings
         cosine_1 = cosine_similarity(
-            [p_dict["section_embedding_1"]], [d_dict["section_embedding_1"]]
+            [p_dict[f"{compare_on}_embedding_1"]], [d_dict[f"{compare_on}_embedding_1"]]
         )[0][0]
         cosine_2 = cosine_similarity(
-            [p_dict["section_embedding_2"]], [d_dict["section_embedding_2"]]
+            [p_dict[f"{compare_on}_embedding_2"]], [d_dict[f"{compare_on}_embedding_2"]]
         )[0][0]
         # Combine results
         result = {
@@ -756,6 +756,8 @@ def compare_documents_content(
 
 
 async def extract_plan_and_content(input: str | Path, doc_type: str) -> Dict[str, Any]:
+    """Extract plans and content for a range of doc_types. Write ouputs to individual files.
+    Return a dictionary containing the plan and content for the input."""
     logger.info(f"\n\tExtracting plan and content for: {input}")
     start = time()
     # Load depending on doc_type
