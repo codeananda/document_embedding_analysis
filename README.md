@@ -1,4 +1,4 @@
-# 📄 Document Extraction
+# 📄 Document Embedding Analysis
 *Harnessing embeddings for direct content comparison analysis.*
 
 ## 💻 How to Run the Code
