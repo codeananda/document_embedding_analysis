@@ -65,6 +65,8 @@ def truncated_pprint(obj, N=5):
 
 
 def load_arxiv_paper(path: str | Path) -> Dict[str, str]:
+    """Load an arXiv paper from disk to a dict with keys "Title", "Abstract", "Content",
+    and "References"."""
     doc = Path(path)
     # Extract all text from pdf
     text = extract_text(doc)
@@ -804,6 +806,18 @@ async def extract_plans_and_content(
 
 
 async def extract_plan_and_content_arxiv(path: str | Path) -> Dict[str, Any]:
+    """Given a path to an arxiv pdf on disk, return a dictionary with the title, abstract,
+    plan and associated embeddings.
+
+    Note: due to the async nature of the function, it must be run using either asyncio.run()
+    if called from a script, or using `await` if called from another async function or jupyter
+    notebook.
+
+    Example Usage:
+    >>> import asyncio
+    >>> path = "path/to/arxiv.pdf"
+    >>> plan_json = asyncio.run(extract_plan_and_content_arxiv(path))
+    """
     return await extract_plan_and_content(path, doc_type="arxiv")
 
 
@@ -824,6 +838,18 @@ async def extract_plan_and_content_wikipedia(url: str) -> Dict[str, Any]:
 
 
 async def extract_plan_and_content_patent(patent_file: str | Path) -> Dict[str, Any]:
+    """Given a path to a patent file on disk, return a dictionary with the title, abstract,
+    plan and associated embeddings.
+
+    Note: due to the async nature of the function, it must be run using either asyncio.run()
+    if called from a script, or using `await` if called from another async function or jupyter
+    notebook.
+
+    Example Usage:
+    >>> import asyncio
+    >>> path = "path/to/patent.txt"
+    >>> plan_json = asyncio.run(extract_plan_and_content_patent(path))
+    """
     return await extract_plan_and_content(patent_file, doc_type="patent")
 
 
