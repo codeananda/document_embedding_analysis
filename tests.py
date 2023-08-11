@@ -45,3 +45,11 @@ def test_compare_documents_sections_different_documents():
 
     for value in result["content_total_similarity"].values():
         assert not is_approximately_equal(value, 1.0)
+
+
+def run_tests():
+    test_compare_documents_plans_same_document()
+    test_compare_documents_sections_same_document()
+    test_compare_documents_plans_different_documents()
+    test_compare_documents_sections_different_documents()
+    print("All tests passed!")
