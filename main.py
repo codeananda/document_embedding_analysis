@@ -267,8 +267,12 @@ async def _extract_title(string: str) -> str:
         type="string",
         required=True,
     )
-    document = await document.extract(properties=[properties]).execute()
-    return document.transformed_content
+    try:
+        document = await document.extract(properties=[properties]).execute()
+        return document.transformed_content
+    except Exception as e:
+        logger.error(f"Error extracting title from string: {e}")
+        return "None"
 
 
 async def divide_sections_if_too_large(
