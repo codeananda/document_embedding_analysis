@@ -1,4 +1,4 @@
-from main import compare_documents_plans, compare_documents_sections
+from main import compare_documents_plans, compare_documents_content
 
 
 def is_approximately_equal(x, y, epsilon=1e-10):
@@ -18,7 +18,7 @@ def test_compare_documents_plans_same_document():
 
 
 def test_compare_documents_sections_same_document():
-    result = compare_documents_sections(
+    result = compare_documents_content(
         "output/wikipedia/Dual-phase evolution.json",
         "output/wikipedia/Dual-phase evolution.json",
     )
@@ -38,7 +38,7 @@ def test_compare_documents_plans_different_documents():
 
 
 def test_compare_documents_sections_different_documents():
-    result = compare_documents_sections(
+    result = compare_documents_content(
         "output/wikipedia/Dual-phase evolution.json",
         "output/wikipedia/Climate Change.json",
     )

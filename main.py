@@ -733,7 +733,7 @@ def compare_documents_plans(
     return _compare_documents(document1, document2, compare_on="section")
 
 
-def compare_documents_sections(
+def compare_documents_content(
     document1: str | Path | Dict[str, Any],
     document2: str | Path | Dict[str, Any],
 ) -> Dict[str, Dict[str, float]]:
@@ -748,7 +748,7 @@ def compare_documents_sections(
     >>> url_2 = 'https://en.wikipedia.org/wiki/Dual-phase_evolution'
     >>> doc_1 = await extract_plan_and_content_wikipedia(url_1)
     >>> doc_2 = await extract_plan_and_content_wikipedia(url_2)
-    >>> compare_sections = compare_documents_sections(doc_1, doc_2, None)
+    >>> compare_sections = compare_documents_content(doc_1, doc_2, None)
     """
     # TODO - do we really need method? Or can we just do every metric every time?
     return _compare_documents(document1, document2, compare_on="content")
