@@ -577,7 +577,9 @@ async def get_embeddings(
 
 
 def _compare_documents(
-    document: Dict[str, Any], prediction: Dict[str, Any], compare_on: str = "section"
+    document: str | Path | Dict[str, Any],
+    prediction: str | Path | Dict[str, Any],
+    compare_on: str = "section",
 ):
     """Compare the 'compare_on' sections of document and prediction. Calculate MAUVE,
     and ROUGE-L scores on the actual text, and cosine similarity on the embeddings.
@@ -598,6 +600,14 @@ def _compare_documents(
         raise ValueError(
             f"`compare_on` must be 'section' or 'content'. Received {compare_on}"
         )
+
+    if isinstance(document, str) or isinstance(document, Path):
+        with open(document, "r") as f:
+            document = json.load(f)
+
+    if isinstance(prediction, str) or isinstance(prediction, Path):
+        with open(prediction, "r") as f:
+            prediction = json.load(f)
 
     if not isinstance(document, dict) or not isinstance(prediction, dict):
         raise TypeError(
@@ -624,11 +634,16 @@ def _compare_documents(
     rouge = load("rouge")
 
     section_results = []
-    predict_plan = prediction["plan"]
-    doc_plan = document["plan"]
+    doc_plan: List[Dict[str, Any]] = document["plan"]
+    predict_plan: List[Dict[str, Any]] = prediction["plan"]
+
+    logger.info(
+        f"\n\t{doc1_name} has {len(doc_plan)} sections."
+        f"\n\t{doc2_name} has {len(predict_plan)} sections."
+    )
+    total_comparisons = min(len(doc_plan), len(predict_plan))
     # If plans have differnet lengths, just goes up to shortest
-    for i, (p_dict, d_dict) in enumerate(zip(predict_plan, doc_plan), start=1):
-        idx = i
+    for idx, (p_dict, d_dict) in enumerate(zip(predict_plan, doc_plan), start=1):
         # Compute MAUVE
         mauve_results = mauve.compute(
             predictions=[p_dict["section"]], references=[d_dict["section"]]
@@ -657,6 +672,7 @@ def _compare_documents(
             "embedding2_cosine_similarity": cosine_2,
         }
         section_results.append(result)
+        logger.info(f"{idx}/{total_comparisons} sections compared.")
 
     # Calcualte total scores
     mauve_total = np.mean([x["mauve_similarity"] for x in section_results])
@@ -689,18 +705,22 @@ def _compare_documents(
     seconds = end - start
     mins = seconds / 60
     logger.info(
-        f"\n\tFinished comparing two documents on {compare_on}:"
+        f"\n\tFinished comparing document {compare_on}s:"
         f"\n\t\tThat took: {mins:.2f} mins ({seconds:.0f} seconds)"
     )
     return output
 
 
 def compare_documents_plans(
-    document1: Dict[str, Any], document2: Dict[str, Any], method: str = None
+    document1: str | Path | Dict[str, Any],
+    document2: str | Path | Dict[str, Any],
 ) -> Dict[str, float]:
     """This function takes two documents, a comparison method, compares the plans
     of the documents using the specified method, and returns a dictionary containing
     the similarity scores.
+
+    Definition: a document's 'plan' is the headings and subheadings of the document in
+                order.
 
     Example Usage:
     >>> url_1 = 'https://en.wikipedia.org/wiki/Simulated_annealing'
@@ -714,11 +734,14 @@ def compare_documents_plans(
 
 
 def compare_documents_sections(
-    document1: Dict[str, Any], document2: Dict[str, Any], method: str = None
+    document1: str | Path | Dict[str, Any],
+    document2: str | Path | Dict[str, Any],
 ) -> Dict[str, Dict[str, float]]:
     """This function takes two documents, a comparison method, compares the sections
     of the documents using the specified method, and returns a dictionary containing
     the section-wise similarity scores.
+
+    Definition: a document's 'sections' are the content of the headings and subheadings
 
     Example Usage:
     >>> url_1 = 'https://en.wikipedia.org/wiki/Simulated_annealing'
