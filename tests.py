@@ -52,4 +52,9 @@ def run_tests():
     test_compare_documents_sections_same_document()
     test_compare_documents_plans_different_documents()
     test_compare_documents_sections_different_documents()
+    print()
     print("All tests passed!")
+
+
+if __name__ == "__main__":
+    run_tests()
