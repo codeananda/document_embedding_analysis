@@ -731,7 +731,7 @@ def compare_documents_sections(
     return _compare_documents(document1, document2, compare_on="content")
 
 
-async def _extract_plan_and_content(input: str | Path, doc_type: str) -> Dict[str, Any]:
+async def extract_plan_and_content(input: str | Path, doc_type: str) -> Dict[str, Any]:
     logger.info(f"\n\tExtracting plan and content for: {input}")
     start = time()
     # Load depending on doc_type
@@ -771,8 +771,18 @@ async def _extract_plan_and_content(input: str | Path, doc_type: str) -> Dict[st
     return plan_json
 
 
+async def extract_plans_and_content(
+    inputs: List[str | Path], doc_type: str
+) -> List[Dict[str, Any]]:
+    """Extract plans and content for a list of inputs. Write ouputs to individual files.
+    Return a list of dictionaries containing the plan and content for each input."""
+    return [
+        await extract_plan_and_content(input, doc_type=doc_type) for input in inputs
+    ]
+
+
 async def extract_plan_and_content_arxiv(path: str | Path) -> Dict[str, Any]:
-    return await _extract_plan_and_content(path, doc_type="arxiv")
+    return await extract_plan_and_content(path, doc_type="arxiv")
 
 
 async def extract_plan_and_content_wikipedia(url: str) -> Dict[str, Any]:
@@ -788,30 +798,11 @@ async def extract_plan_and_content_wikipedia(url: str) -> Dict[str, Any]:
     >>> url = "https://en.wikipedia.org/wiki/Dual-phase_evolution"
     >>> plan_json = asyncio.run(extract_plan_and_content_wikipedia(url))
     """
-    return await _extract_plan_and_content(url, doc_type="wikipedia")
+    return await extract_plan_and_content(url, doc_type="wikipedia")
 
 
 async def extract_plan_and_content_patent(patent_file: str | Path) -> Dict[str, Any]:
-    return await _extract_plan_and_content(patent_file, doc_type="patent")
-
-
-def document_to_json_dataset(
-    document_path_in: str, doc_type: str, json_path_out: str
-) -> None:
-    """This function takes the document path in, type, and a an output path, generate the
-    JSON using all functions above, save it to an output if not null and return JSON.
-    """
-    # TODO - what is doc_type? wikipedia_article, arxiv, patent
-    # TODO - could document_path_in be a url?
-    pass
-
-
-def documents_to_json_datasets(
-    documents: List[Dict[str, Any]], json_path_out: str
-) -> None:
-    """Convert a list of documents to JSON datasets using functions above, saves it as
-    an aggregated JSON file"""
-    pass
+    return await extract_plan_and_content(patent_file, doc_type="patent")
 
 
 if __name__ == "__main__":
