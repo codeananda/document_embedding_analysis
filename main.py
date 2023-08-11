@@ -280,7 +280,7 @@ async def divide_sections_if_too_large(
     max_section_length: int = 512,
     doc_type: str = "patent",
 ) -> Dict[str, str]:
-    """This function takes an existing dictionary containing the plan and sections
+    """This function takes an existing dictionary containing the section heaadings and
     content (from above functions), checks if any section is too large (i.e., more
     than 512 tokens), divides such sections into smaller sections, generates a new
     title, and returns the updated dictionary
@@ -580,7 +580,7 @@ def _compare_documents(
     document: str | Path | Dict[str, Any],
     prediction: str | Path | Dict[str, Any],
     compare_on: str = "section",
-):
+) -> Dict[str, Any]:
     """Compare the 'compare_on' sections of document and prediction. Calculate MAUVE,
     and ROUGE-L scores on the actual text, and cosine similarity on the embeddings.
 
@@ -711,13 +711,13 @@ def _compare_documents(
     return output
 
 
-def compare_documents_plans(
+def compare_documents_sections(
     document1: str | Path | Dict[str, Any],
     document2: str | Path | Dict[str, Any],
-) -> Dict[str, float]:
-    """This function takes two documents, a comparison method, compares the plans
-    of the documents using the specified method, and returns a dictionary containing
-    the similarity scores.
+) -> Dict[str, Any]:
+    """This function takes two documents, a comparison method, compares the section
+    headings (also called plans) of the documents in order using the specified method,
+    and returns a dictionary containing the similarity scores.
 
     Definition: a document's 'plan' is the headings and subheadings of the document in
                 order.
@@ -727,21 +727,20 @@ def compare_documents_plans(
     >>> url_2 = 'https://en.wikipedia.org/wiki/Dual-phase_evolution'
     >>> doc_1 = await extract_plan_and_content_wikipedia(url_1)
     >>> doc_2 = await extract_plan_and_content_wikipedia(url_2)
-    >>> compare_plan = compare_documents_plans(doc_1, doc_2, None)
+    >>> compare_plan = compare_documents_sections(doc_1, doc_2, None)
     """
-    # TODO - do we really need method? Or can we just do every metric every time?
     return _compare_documents(document1, document2, compare_on="section")
 
 
 def compare_documents_content(
     document1: str | Path | Dict[str, Any],
     document2: str | Path | Dict[str, Any],
-) -> Dict[str, Dict[str, float]]:
+) -> Dict[str, Any]:
     """This function takes two documents, a comparison method, compares the sections
     of the documents using the specified method, and returns a dictionary containing
     the section-wise similarity scores.
 
-    Definition: a document's 'sections' are the content of the headings and subheadings
+    Definition: a document's 'content' is the text under the headings and subheadings
 
     Example Usage:
     >>> url_1 = 'https://en.wikipedia.org/wiki/Simulated_annealing'
