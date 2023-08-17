@@ -180,6 +180,11 @@ def load_patent_file(patent_file: str | Path) -> Dict[str, str]:
                 f"Expected sections in [TITLE, DESCR, CLAIM, PDFEP]. Received: {x}"
             )
 
+    logger.info(
+        f"Extracted {len(patent_dict)} sections from patent file named: "
+        f"{list(patent_dict.keys())}"
+    )
+
     return patent_dict
 
 
@@ -462,14 +467,20 @@ def generate_embeddings_plan_and_section_content(
         title = content[0].split("\t")[-1].strip()
         # Remove illegal characters from title (it's used as a filename)
         title = "".join(i for i in title if i not in "\/:*?<>|")
-        abstract = content[1]
+        try:
+            abstract = content[1]
+        except IndexError:
+            abstract = "no abstract"
         total_sections = len(headings) - 2
         start_index = 2
     elif doc_type == "arxiv":
         # The first key/value pairs in arxiv dicts are {'Title': title, 'Abstract': abstract}
         # so we take the first two elements of content
         title = content[0]
-        abstract = content[1]
+        try:
+            abstract = content[1]
+        except IndexError:
+            abstract = "no abstract"
         total_sections = len(headings) - 2
         start_index = 2
     else:
