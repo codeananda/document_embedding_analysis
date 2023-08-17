@@ -785,6 +785,18 @@ async def extract_plan_and_content(input: str | Path, doc_type: str) -> Dict[str
         )
     # Divide and create embeddings
     article_dict = await divide_sections_if_too_large(article_dict, doc_type=doc_type)
+    num_sections = len(article_dict.keys())
+    min_required_sections = 3
+    if num_sections < min_required_sections:
+        error_msg = (
+            f"\n\tInput: {input}"
+            f"\n\tInput document is too small. Found {num_sections} sections. We require at "
+            f"least {min_required_sections} sections."
+            f"\n\tSections Found: {list(article_dict.keys())}"
+            f"\n\tSkipping this document and moving onto the next."
+        )
+        logger.error(error_msg)
+        return {"title": str(input), "content": error_msg}
     plan_json = generate_embeddings_plan_and_section_content(
         article_dict, doc_type=doc_type
     )
@@ -884,6 +896,10 @@ if __name__ == "__main__":
         asyncio.run(extract_plan_and_content_wikipedia(wiki))
 
     patents = list(Path("data/patents").glob("*"))
+    # patents = [
+    #     "data/patents/MICROWAVE TURNTABLE CONVECTION HEATER.txt",
+    #     "data/patents/PHARMACEUTICAL COMPOSITIONS OF GALLIUM COMPLEXES OF 3-HYDROXY-4-PYRONES.txt",
+    # ]
     for patent in patents:
         asyncio.run(extract_plan_and_content_patent(patent))
 
