@@ -1,13 +1,20 @@
 # 📄 Document Embedding Analysis
 *Harnessing embeddings for direct content comparison analysis.*
 
-# 🎤 Introduction
+## 🎤 Introduction
 
 My client wanted to test how well LLMs like ChatGPT create long-form text given an outline (all the headings and subheadings in a text). If we take the [Wikipedia page for self-driving cars](https://en.wikipedia.org/wiki/Self-driving_car) as an example, we see the following headings: Definitions, Automated driver assistance system, Autonomous vs. automated, Autonomous versus cooperative, etc. My client wanted to give these headings to ChatGPT, ask it to write the content, and compare that content with the ground truth.
 
 My goal was to build a dataset for him. I used Wikipedia articles, patents, and Arxiv papers. I extracted the headings and subheadings. Then, for any sections that were longer than 512 tokens, I split them up and gave them new unique titles. 
 
 After that, I created embeddings for everything extracted (headings and content) and analysed them, e.g., calculating the Rouge-L, MAUVE and cosine similarity scores. Some scores would only accept a max of 512 tokens (hence why I had to split them above). 
+
+## ⭐ Review
+
+My client was delighted with the work and left the following review.
+
+<img width="800" alt="image" src="https://github.com/codeananda/document_embedding_analysis/assets/51246969/85b6c44d-6abd-4bdc-9c04-afcad9ae2898">
+
 
 ## 💻 How to Run the Code
 
