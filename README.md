@@ -3,7 +3,7 @@
 
 ## 🎤 Introduction
 
-My client wanted to test how well LLMs like ChatGPT create long-form text given an outline (all the headings and subheadings in a text). If we take the [Wikipedia page for self-driving cars](https://en.wikipedia.org/wiki/Self-driving_car) as an example, we see the following headings: Definitions, Automated driver assistance system, Autonomous vs. automated, Autonomous versus cooperative, etc. My client wanted to give these headings to ChatGPT, ask it to write the content, and compare that content with the ground truth.
+My client wanted to test how well LLMs like ChatGPT create long-form text given an outline (all the headings and subheadings in a text). If we take the [Wikipedia page for self-driving cars](https://en.wikipedia.org/wiki/Self-driving_car) as an example, we see the following headings: **Definitions, Automated driver assistance system, Autonomous vs. automated, Autonomous versus cooperative**, etc. My client wanted to give these headings to ChatGPT, ask it to write the content, and compare that content with the ground truth.
 
 My goal was to build a dataset for him. I used Wikipedia articles, patents, and Arxiv papers. I extracted the headings and subheadings. Then, for any sections that were longer than 512 tokens, I split them up and gave them new unique titles. 
 
