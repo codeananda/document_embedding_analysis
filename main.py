@@ -11,7 +11,6 @@ from typing import List, Dict, Any
 from uuid import uuid4
 
 import numpy as np
-import openai
 import requests
 import tiktoken
 from bs4 import BeautifulSoup, Comment
@@ -23,11 +22,12 @@ from langchain.text_splitter import (
     RecursiveCharacterTextSplitter,
 )
 from loguru import logger
+from openai import OpenAI
 from pdfminer.high_level import extract_text
 from sklearn.metrics.pairwise import cosine_similarity
 
 _ = load_dotenv(find_dotenv())
-raise Exception("The 'openai.api_key' option isn't read in the client API. You will need to pass it when you instantiate the client, e.g. 'OpenAI(api_key=os.getenv("OPENAI_API_KEY"))'")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
 def _num_tokens_from_string(string: str, encoding_name: str = "gpt-3.5-turbo") -> int:
@@ -892,14 +892,14 @@ if __name__ == "__main__":
         "https://en.wikipedia.org/wiki/2022%E2%80%932023_food_crises",
         "https://en.wikipedia.org/wiki/Economic_impacts_of_climate_change",
     ]
-    for wiki in wikipedia_articles:
-        asyncio.run(extract_plan_and_content_wikipedia(wiki))
+    # for wiki in wikipedia_articles:
+    #     asyncio.run(extract_plan_and_content_wikipedia(wiki))
 
     patents = list(Path("data/patents").glob("*"))
-    # patents = [
-    #     "data/patents/MICROWAVE TURNTABLE CONVECTION HEATER.txt",
-    #     "data/patents/PHARMACEUTICAL COMPOSITIONS OF GALLIUM COMPLEXES OF 3-HYDROXY-4-PYRONES.txt",
-    # ]
+    patents = [
+        "data/patents/MICROWAVE TURNTABLE CONVECTION HEATER.txt",
+        "data/patents/PHARMACEUTICAL COMPOSITIONS OF GALLIUM COMPLEXES OF 3-HYDROXY-4-PYRONES.txt",
+    ]
     for patent in patents:
         asyncio.run(extract_plan_and_content_patent(patent))
 
