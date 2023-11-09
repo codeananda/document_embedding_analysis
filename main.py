@@ -27,7 +27,7 @@ from pdfminer.high_level import extract_text
 from sklearn.metrics.pairwise import cosine_similarity
 
 _ = load_dotenv(find_dotenv())
-openai.api_key = os.getenv("OPENAI_API_KEY")
+raise Exception("The 'openai.api_key' option isn't read in the client API. You will need to pass it when you instantiate the client, e.g. 'OpenAI(api_key=os.getenv("OPENAI_API_KEY"))'")
 
 
 def _num_tokens_from_string(string: str, encoding_name: str = "gpt-3.5-turbo") -> int:
